@@ -33,7 +33,7 @@ module KIFRSettings
       file: "000_KIFR_Version.rb",
       version: KIFRSettings::VERSION,
       download_url: nil,
-      version_check_url: nil,
+      version_check_url: "https://raw.githubusercontent.com/Stonewallx/KIF-Redux/refs/heads/main/Data/Scripts/800_KIFR/000_KIFR_Version.rb",
       changelog_url: nil
     })
   end

@@ -69,7 +69,12 @@ class ClothesShopView < PokemonMart_Scene
       @sprites["itemtextwindow"].text = text
       itemwindow.refresh
     end
-    @sprites["moneywindow"].text = _INTL("{2}:\r\n<r>{1}", @adapter.getMoneyString, @currency_name)
+    # Update money display with animation support
+    if @sprites["moneywindow"].is_a?(Window_AnimatedMoney)
+      @sprites["moneywindow"].set_target(@adapter.getMoney)
+    else
+      @sprites["moneywindow"].text = _INTL("{2}:\r\n<r>{1}", @adapter.getMoneyString, @currency_name)
+    end
   end
 
   def updateTrainerPreview()

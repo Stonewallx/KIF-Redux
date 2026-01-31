@@ -1576,6 +1576,8 @@ def pbFuse(pokemon, poke2, splicer_item)
     returnItemsToBag(pokemon, poke2)
     fus.pbFusionScreen(false, use_supersplicers_mechanics)
     $game_variables[VAR_FUSE_COUNTER] += 1 #fuse counter
+    # KIFR: Track fusion for milestone rewards
+    Gifts::Rewards.record_fusion_created if defined?(Gifts::Rewards)
     fus.pbEndScreen
     return true
   end

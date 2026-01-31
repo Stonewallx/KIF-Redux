@@ -117,6 +117,9 @@ class Scene_Map
     $game_map.autoplay
     Graphics.frame_reset
     Input.update
+    
+    # Check for scheduled event gifts on map transfer
+    Gifts::Events.check_and_deliver if defined?(Gifts::Events)
   end
 
   def call_menu
@@ -217,6 +220,11 @@ class Scene_Map
           $game_temp.menu_beep = true
           dayOfWeek = getDayOfTheWeek().to_s
           $scene.spriteset.addUserSprite(LocationWindow.new($game_map.name+ "\n"+ pbGetTimeNow.strftime("%I:%M %p") + "\n" + dayOfWeek))
+          # Show gift notification if there are unseen gifts/unclaimed milestones and notifications are enabled
+          notifications_enabled = (KIFRSettings.get(:gift_notifications, 1) == 1 rescue true)
+          if notifications_enabled && defined?(GiftNotificationWindow) && GiftNotificationWindow.should_show?
+            $scene.spriteset.addUserSprite(GiftNotificationWindow.new)
+          end
         end
       elsif Input.trigger?(Input::SPECIAL)
         unless $game_system.menu_disabled || $game_player.moving?

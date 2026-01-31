@@ -433,6 +433,9 @@ class PokeBattle_Battle
       PBDebug.log("")
       PBDebug.log("***Player won***")
       if trainerBattle?
+        # Track trainer battle wins for KIFR milestones
+        Gifts::Rewards.record_battle_won if defined?(Gifts::Rewards)
+        
         @scene.pbTrainerBattleSuccess
         #stop here without more input if looping
         dontdoit = false
@@ -488,6 +491,10 @@ class PokeBattle_Battle
       PBDebug.log("")
       PBDebug.log("***Player lost***") if @decision==2
       PBDebug.log("***Player drew with opponent***") if @decision==5
+      # Track trainer battle losses for KIFR (useful for trainer control mod)
+      if trainerBattle? && @decision == 2
+        Gifts::Rewards.record_battle_lost if defined?(Gifts::Rewards)
+      end
       if @internalBattle
         pbDisplayPaused(_INTL("You have no more Pokémon that can fight!"))
         #stop here without more input if looping

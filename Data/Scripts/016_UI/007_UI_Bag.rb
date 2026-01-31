@@ -4,6 +4,8 @@
 class Window_PokemonBag < Window_DrawableCommand
   attr_reader :pocket
   attr_accessor :sorting
+  
+  CURSOR_RADIUS = 4
 
   def initialize(bag,filterlist,pocket,x,y,width,height)
     @bag        = bag
@@ -20,6 +22,54 @@ class Window_PokemonBag < Window_DrawableCommand
   def dispose
     @swaparrow.dispose
     super
+  end
+  
+  # Get cursor fill color from KIFR settings
+  def cursor_color
+    return Color.new(100, 180, 220, 180) unless defined?(SHOP_CURSOR_COLORS)  # Default blue
+    index = ($PokemonSystem.kifr_shop_cursor_color rescue 0) || 0
+    index = 0 if index < 0 || index >= SHOP_CURSOR_COLORS.length
+    SHOP_CURSOR_COLORS[index][:fill]
+  end
+  
+  # Swap cursor color (for sorting mode)
+  def swap_cursor_color
+    Color.new(220, 100, 100, 180)  # Red for swap mode
+  end
+  
+  # Draw a rounded rectangle for cursor
+  def draw_rounded_rect(bitmap, x, y, width, height, radius, fill_color)
+    radius = [radius, width / 2, height / 2].min
+    
+    bitmap.fill_rect(x + radius, y + radius, width - radius * 2, height - radius * 2, fill_color)
+    bitmap.fill_rect(x + radius, y, width - radius * 2, radius, fill_color)
+    bitmap.fill_rect(x + radius, y + height - radius, width - radius * 2, radius, fill_color)
+    bitmap.fill_rect(x, y + radius, radius, height - radius * 2, fill_color)
+    bitmap.fill_rect(x + width - radius, y + radius, radius, height - radius * 2, fill_color)
+    
+    draw_corner(bitmap, x + radius, y + radius, radius, fill_color, :top_left)
+    draw_corner(bitmap, x + width - radius - 1, y + radius, radius, fill_color, :top_right)
+    draw_corner(bitmap, x + radius, y + height - radius - 1, radius, fill_color, :bottom_left)
+    draw_corner(bitmap, x + width - radius - 1, y + height - radius - 1, radius, fill_color, :bottom_right)
+  end
+  
+  def draw_corner(bitmap, cx, cy, radius, color, corner)
+    (0..radius).each do |dx|
+      (0..radius).each do |dy|
+        if dx * dx + dy * dy <= radius * radius
+          case corner
+          when :top_left
+            bitmap.fill_rect(cx - dx, cy - dy, 1, 1, color)
+          when :top_right
+            bitmap.fill_rect(cx + dx, cy - dy, 1, 1, color)
+          when :bottom_left
+            bitmap.fill_rect(cx - dx, cy + dy, 1, 1, color)
+          when :bottom_right
+            bitmap.fill_rect(cx + dx, cy + dy, 1, 1, color)
+          end
+        end
+      end
+    end
   end
 
   def pocket=(value)
@@ -56,8 +106,11 @@ class Window_PokemonBag < Window_DrawableCommand
 
   def drawCursor(index,rect)
     if self.index==index
+      # Draw rounded rectangle cursor at same position as original cursor image
       bmp = (@sorting) ? @swaparrow.bitmap : @selarrow.bitmap
-      pbCopyBitmap(self.contents,bmp,rect.x,rect.y+2)
+      color = @sorting ? swap_cursor_color : cursor_color
+      # Position: right 8px, down 15px from original; Width: full size - 16px, Height: half size - 1px
+      draw_rounded_rect(self.contents, rect.x + 8, rect.y + 17, bmp.width - 16, bmp.height / 2 - 1, CURSOR_RADIUS, color)
     end
   end
 
@@ -105,11 +158,13 @@ class Window_PokemonBag < Window_DrawableCommand
     dheight = self.height-self.borderY
     self.contents = pbDoEnsureBitmap(self.contents,dwidth,dheight)
     self.contents.clear
+    # Draw cursor first (behind text)
+    drawCursor(self.index,itemRect(self.index))
+    # Then draw items on top
     for i in 0...@item_max
       next if i<self.top_item-1 || i>self.top_item+self.page_item_max
       drawItem(i,@item_max,itemRect(i))
     end
-    drawCursor(self.index,itemRect(self.index))
   end
 
   def update

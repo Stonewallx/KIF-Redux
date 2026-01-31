@@ -35,14 +35,35 @@ module MessageConfig
   @@systemSize      = 29
 
   def self.pbDefaultSystemFrame
-    if $PokemonSystem
-      return pbResolveBitmap("Graphics/Windowskins/" + Settings::MENU_WINDOWSKINS[$PokemonSystem.frame]) || ""
-    else
-      return pbResolveBitmap("Graphics/Windowskins/" + Settings::MENU_WINDOWSKINS[0]) || ""
+    # KIFR: Use kifr_global_frame setting if available, otherwise default to KIFR Choice 1a
+    if $PokemonSystem && defined?(KIFR_WINDOWSKINS)
+      frame_index = $PokemonSystem.kifr_global_frame || 1
+      frame_index = 0 if frame_index < 0 || frame_index >= KIFR_WINDOWSKINS.length
+      skin_name = KIFR_WINDOWSKINS[frame_index]
+      return pbResolveBitmap("Graphics/Windowskins/#{skin_name}") || ""
     end
+    # Fallback to kifr_choice1
+    return pbResolveBitmap("Graphics/Windowskins/kifr_choice1") || ""
   end
 
   def self.pbDefaultSpeechFrame
+    # KIFR: Check if using separate speech frame
+    if $PokemonSystem
+      # If separate speech is enabled, use the speech frame setting
+      if ($PokemonSystem.kifr_separate_speech || 0) == 1
+        speech_index = $PokemonSystem.kifr_speech_frame || 0
+        speech_index = 0 if speech_index < 0 || speech_index >= Settings::SPEECH_WINDOWSKINS.length
+        return pbResolveBitmap("Graphics/Windowskins/" + Settings::SPEECH_WINDOWSKINS[speech_index]) || ""
+      end
+      # Otherwise sync with global frame
+      if defined?(KIFR_WINDOWSKINS)
+        frame_index = $PokemonSystem.kifr_global_frame || 1
+        frame_index = 0 if frame_index < 0 || frame_index >= KIFR_WINDOWSKINS.length
+        skin_name = KIFR_WINDOWSKINS[frame_index]
+        return pbResolveBitmap("Graphics/Windowskins/#{skin_name}") || ""
+      end
+    end
+    # Fallback to original textskin behavior
     if $PokemonSystem
       return pbResolveBitmap("Graphics/Windowskins/" + Settings::SPEECH_WINDOWSKINS[$PokemonSystem.textskin]) || ""
     else

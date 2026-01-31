@@ -117,6 +117,8 @@ class ClothesShopPresenter < PokemonMartScreen
         next
       end
       @adapter.setMoney(@adapter.getMoney - price)
+      @scene.pbRefresh  # Trigger animated money display
+      @scene.pbWaitForMoneyAnimation if @scene.respond_to?(:pbWaitForMoneyAnimation)
       @stock.compact!
       pbDisplayPaused(_INTL("Here you are! Thank you!")) { pbSEPlay("Mart buy item") }
       @adapter.addItem(item)

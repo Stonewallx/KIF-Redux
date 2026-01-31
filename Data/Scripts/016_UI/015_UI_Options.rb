@@ -1,4 +1,4 @@
-#===============================================================================
+﻿#===============================================================================
 #
 #===============================================================================
 class PokemonSystem
@@ -344,10 +344,33 @@ class PokemonSystem
     @speeduplimit = saved.speeduplimit if saved.speeduplimit
     @speedvaluedef = saved.speedvaluedef if saved.speedvaluedef
     @shiny_cache = saved.shiny_cache if saved.shiny_cache
-
+    
+    # KIFR Settings
+    @kifr_color_theme = saved.kifr_color_theme if saved.respond_to?(:kifr_color_theme) && saved.kifr_color_theme
+    @kifr_category_theme = saved.kifr_category_theme if saved.respond_to?(:kifr_category_theme) && saved.kifr_category_theme
+    @kifr_global_frame = saved.kifr_global_frame if saved.respond_to?(:kifr_global_frame) && saved.kifr_global_frame
+    @kifr_separate_speech = saved.kifr_separate_speech if saved.respond_to?(:kifr_separate_speech) && saved.kifr_separate_speech
+    @kifr_speech_frame = saved.kifr_speech_frame if saved.respond_to?(:kifr_speech_frame) && saved.kifr_speech_frame
+    @kifr_shop_cursor_color = saved.kifr_shop_cursor_color if saved.respond_to?(:kifr_shop_cursor_color) && saved.kifr_shop_cursor_color
 
     MessageConfig.pbSetTextSpeed(MessageConfig.pbSettingToTextSpeed($PokemonSystem.textspeed))
-    MessageConfig.pbSetSpeechFrame("Graphics/Windowskins/" + Settings::SPEECH_WINDOWSKINS[$PokemonSystem.textskin])
+    
+    # KIFR: Set frames based on global frame setting
+    if defined?(KIFR_WINDOWSKINS) && @kifr_global_frame
+      skin_name = KIFR_WINDOWSKINS[@kifr_global_frame] || "KIFR Choice 1"
+      MessageConfig.pbSetSystemFrame("Graphics/Windowskins/#{skin_name}")
+      # Check if using separate speech frame
+      if (@kifr_separate_speech || 0) == 1 && @kifr_speech_frame
+        MessageConfig.pbSetSpeechFrame("Graphics/Windowskins/" + Settings::SPEECH_WINDOWSKINS[@kifr_speech_frame])
+      else
+        MessageConfig.pbSetSpeechFrame("Graphics/Windowskins/#{skin_name}")
+      end
+    else
+      # Fallback to default KIFR frame
+      MessageConfig.pbSetSystemFrame("Graphics/Windowskins/KIFR Choice 1")
+      MessageConfig.pbSetSpeechFrame("Graphics/Windowskins/KIFR Choice 1")
+    end
+    
     # pbSetResizeFactor($PokemonSystem.screensize)
     if $PokemonSystem.kurayfonts == 0
       # MessageConfig::FONT_SIZE = 29
@@ -1200,7 +1223,8 @@ class Window_PokemonOption < Window_DrawableCommand
         @mustUpdateOptions = true
         @mustUpdateDescription = true
       elsif Input.trigger?(Input::USE)
-        if @options[self.index].is_a?(ButtonOption) || @options[self.index].is_a?(ButtonsOption)
+        if @options[self.index].is_a?(ButtonOption) || @options[self.index].is_a?(ButtonsOption) ||
+           (defined?(ClickOnlyButtonOption) && @options[self.index].is_a?(ClickOnlyButtonOption))
           @options[self.index].activate
           dorefresh = true
           @mustUpdateOptions = true
@@ -1217,7 +1241,7 @@ end
 #===============================================================================
 class PokemonOption_Scene
   def getDefaultDescription
-    return _INTL("Speech frame {1}.", 1 + $PokemonSystem.textskin)
+    return _INTL("Global frame {1}.", 1 + ($PokemonSystem.kifr_global_frame || 0))
   end
 
   def pbUpdate
@@ -1233,11 +1257,45 @@ class PokemonOption_Scene
     @manually_changed_difficulty=false
   end
 
+  # KIFR: Get the windowskin for KIFR/Options menus
+  # Uses the Global Frame setting from KIFR_WINDOWSKINS
+  def self.get_kifr_windowskin
+    return "Graphics/Windowskins/KIFR Choice 1a" unless defined?(KIFR_WINDOWSKINS)
+    index = ($PokemonSystem.kifr_global_frame rescue 1) || 1
+    index = 0 if index < 0 || index >= KIFR_WINDOWSKINS.length
+    skin_name = KIFR_WINDOWSKINS[index]
+    return "Graphics/Windowskins/#{skin_name}"
+  end
+  
+  # KIFR: Get text colors based on global frame (dark vs light)
+  def self.OPTIONS_TEXT_BASE
+    if defined?(pbGlobalFrameIsDark?) && pbGlobalFrameIsDark?
+      return MessageConfig::LIGHT_TEXT_MAIN_COLOR
+    else
+      return Color.new(88, 88, 80)
+    end
+  end
+  
+  def self.OPTIONS_TEXT_SHADOW
+    if defined?(pbGlobalFrameIsDark?) && pbGlobalFrameIsDark?
+      return MessageConfig::LIGHT_TEXT_SHADOW_COLOR
+    else
+      return Color.new(168, 184, 184)
+    end
+  end
+  
   def initUIElements
+    current_skin = PokemonOption_Scene.get_kifr_windowskin
     @sprites["title"] = Window_UnformattedTextPokemon.newWithSize(
       _INTL("Options"), 0, 0, Graphics.width, 64, @viewport)
+    @sprites["title"].setSkin(current_skin)
+    @sprites["title"].baseColor = PokemonOption_Scene.OPTIONS_TEXT_BASE
+    @sprites["title"].shadowColor = PokemonOption_Scene.OPTIONS_TEXT_SHADOW
     @sprites["textbox"] = pbCreateMessageWindow
-    @sprites["textbox"].text = _INTL("Speech frame {1}.", 1 + $PokemonSystem.textskin)
+    @sprites["textbox"].setSkin(current_skin)
+    @sprites["textbox"].baseColor = PokemonOption_Scene.OPTIONS_TEXT_BASE
+    @sprites["textbox"].shadowColor = PokemonOption_Scene.OPTIONS_TEXT_SHADOW
+    @sprites["textbox"].text = _INTL("Global frame {1}.", 1 + ($PokemonSystem.kifr_global_frame || 0))
     @sprites["textbox"].letterbyletter = false
     pbSetSystemFont(@sprites["textbox"].contents)
   end
@@ -1263,9 +1321,16 @@ class PokemonOption_Scene
   end
 
   def initOptionsWindow
+    current_skin = PokemonOption_Scene.get_kifr_windowskin
     optionsWindow = Window_PokemonOption.new(@PokemonOptions, 0,
                                              @sprites["title"].height, Graphics.width,
                                              Graphics.height - @sprites["title"].height - @sprites["textbox"].height)
+    optionsWindow.setSkin(current_skin)
+    # Set text colors based on global frame (dark vs light)
+    optionsWindow.nameBaseColor = PokemonOption_Scene.OPTIONS_TEXT_BASE
+    optionsWindow.nameShadowColor = PokemonOption_Scene.OPTIONS_TEXT_SHADOW
+    optionsWindow.selBaseColor = PokemonOption_Scene.OPTIONS_TEXT_BASE
+    optionsWindow.selShadowColor = PokemonOption_Scene.OPTIONS_TEXT_SHADOW
     optionsWindow.viewport = @viewport
     optionsWindow.visible = true
     return optionsWindow
@@ -1380,16 +1445,7 @@ class PokemonOption_Scene
           for i in 0...@PokemonOptions.length
             @PokemonOptions[i].set(@sprites["option"][i])
           end
-          if $PokemonSystem.textskin != oldTextSkin
-            @sprites["textbox"].setSkin(MessageConfig.pbGetSpeechFrame())
-            @sprites["textbox"].text = _INTL("Speech frame {1}.", 1 + $PokemonSystem.textskin)
-            oldTextSkin = $PokemonSystem.textskin
-          end
-          if $PokemonSystem.frame != oldSystemSkin
-            @sprites["title"].setSkin(MessageConfig.pbGetSystemFrame())
-            @sprites["option"].setSkin(MessageConfig.pbGetSystemFrame())
-            oldSystemSkin = $PokemonSystem.frame
-          end
+          # Note: PIF Settings menus always use KIFR Choice 1a, not affected by frame settings
         end
         if Input.trigger?(Input::BACK)
           break
@@ -1451,6 +1507,7 @@ class KurayOptionsScene < PokemonOption_Scene
     end
     @sprites["title"]=Window_UnformattedTextPokemon.newWithSize(
       _INTL("KIF Settings"),0,0,Graphics.width,64,@viewport)
+    @sprites["title"].setSkin(PokemonOption_Scene.get_kifr_windowskin)
     @sprites["textbox"].text=_INTL("Customize modded features")
 
 
@@ -1611,6 +1668,7 @@ class SLOptionsScene < PokemonOption_Scene
     end
     @sprites["title"]=Window_UnformattedTextPokemon.newWithSize(
       _INTL("Save & Load Options"),0,0,Graphics.width,64,@viewport)
+    @sprites["title"].setSkin(PokemonOption_Scene.get_kifr_windowskin)
     @sprites["textbox"].text=_INTL("Save / Load options")
 
 
@@ -1716,6 +1774,7 @@ class VanillaOptSc_1 < PokemonOption_Scene
     end
     @sprites["title"]=Window_UnformattedTextPokemon.newWithSize(
       _INTL("PIF Settings"),0,0,Graphics.width,64,@viewport)
+    @sprites["title"].setSkin(PokemonOption_Scene.get_kifr_windowskin)
     @sprites["textbox"].text=_INTL("Customize PIF features")
 
 
@@ -1730,9 +1789,7 @@ class VanillaOptSc_1 < PokemonOption_Scene
   def pbGetOptions(inloadscreen = false)
     options = []
 
-    options << ButtonOption.new(_INTL("### GLOBAL ###"),
-      proc {}
-    )
+    options << KIFRSectionHeaderOption.new("GLOBAL")
 
     options << SliderOption.new(_INTL("Music Volume"), 0, 100, 5,
                                 proc { $PokemonSystem.bgmvolume },
@@ -1770,7 +1827,7 @@ class VanillaOptSc_1 < PokemonOption_Scene
                               ["Default to walking when not holding the Run key",
                                "Default to running when not holding the Run key"]
     )
-    options << EnumOption.new(_INTL("Text Speed"), [_INTL("Normal"), _INTL("Fast")],
+    options << EnumOption.new(_INTL("Text Speed"), [_INTL("Normal"), _INTL("Fast"), _INTL("Instant")],
                               proc { $PokemonSystem.textspeed },
                               proc { |value|
                                 $PokemonSystem.textspeed = value
@@ -1831,13 +1888,7 @@ class VanillaOptSc_1 < PokemonOption_Scene
     "Display move animations in battles"
     )
 
-    options << NumberOption.new(_INTL("Speech Frame"), 1, Settings::SPEECH_WINDOWSKINS.length,
-                                proc { $PokemonSystem.textskin },
-                                proc { |value|
-                                  $PokemonSystem.textskin = value
-                                  MessageConfig.pbSetSpeechFrame("Graphics/Windowskins/" + Settings::SPEECH_WINDOWSKINS[value])
-                                }
-    )
+    # Speech Frame removed - use Global Frame in KIFR Settings instead
 
     options << EnumOption.new(_INTL("Text Entry"), [_INTL("Cursor"), _INTL("Keyboard")],
                               proc { $PokemonSystem.textinput },
@@ -1877,9 +1928,7 @@ class VanillaOptSc_1 < PokemonOption_Scene
 
   def pbGetInGameOptions()
     options = []
-    options << ButtonOption.new(_INTL("### PER-SAVE FILE ###"),
-      proc {}
-    )
+    options << KIFRSectionHeaderOption.new("PER-SAVE FILE")
 
     if $game_switches
       options <<
@@ -1998,6 +2047,7 @@ class KurayOptSc_1 < PokemonOption_Scene
     end
     @sprites["title"]=Window_UnformattedTextPokemon.newWithSize(
       _INTL("Shiny settings"),0,0,Graphics.width,64,@viewport)
+    @sprites["title"].setSkin(PokemonOption_Scene.get_kifr_windowskin)
     @sprites["textbox"].text=_INTL("Customize modded features")
 
 
@@ -2012,9 +2062,7 @@ class KurayOptSc_1 < PokemonOption_Scene
   def pbGetOptions(inloadscreen = false)
     options = []
 
-    options << ButtonOption.new(_INTL("### GLOBAL ###"),
-    proc {}
-    )
+    options << KIFRSectionHeaderOption.new("GLOBAL")
 
 
     # options << EnumOption.new(_INTL("Shiny Revamp"), [_INTL("On"), _INTL("Off")],
@@ -2053,9 +2101,7 @@ class KurayOptSc_1 < PokemonOption_Scene
 
   def pbGetInGameOptions()
     options = []
-    options << ButtonOption.new(_INTL("### PER-SAVE FILE ###"),
-    proc {}
-    )
+    options << KIFRSectionHeaderOption.new("PER-SAVE FILE")
 
     options << EnumOption.new(_INTL("Shiny Colors"), [_INTL("Simple"), _INTL("Normal"), _INTL("Advanced")],
                       proc { $PokemonSystem.shinyadvanced },
@@ -2128,6 +2174,7 @@ class KurayOptSc_2 < PokemonOption_Scene
     end
     @sprites["title"]=Window_UnformattedTextPokemon.newWithSize(
       _INTL("Battles & Pokemons settings"),0,0,Graphics.width,64,@viewport)
+    @sprites["title"].setSkin(PokemonOption_Scene.get_kifr_windowskin)
     @sprites["textbox"].text=_INTL("Customize modded features")
 
 
@@ -2142,9 +2189,7 @@ class KurayOptSc_2 < PokemonOption_Scene
   def pbGetOptions(inloadscreen = false)
     options = []
 
-    options << ButtonOption.new(_INTL("### GLOBAL ###"),
-    proc {}
-    )
+    options << KIFRSectionHeaderOption.new("GLOBAL")
 
     options << ButtonOption.new(_INTL("Powerful AI"),
     proc {}
@@ -2166,9 +2211,7 @@ class KurayOptSc_2 < PokemonOption_Scene
 
   def pbGetInGameOptions()
     options = []
-    options << ButtonOption.new(_INTL("### PER-SAVE FILE ###"),
-    proc {}
-    )
+    options << KIFRSectionHeaderOption.new("PER-SAVE FILE")
 
     options << EnumOption.new(_INTL("Wild Battles"), [_INTL("1v1"), _INTL("2v2"), _INTL("3v3")],
                       proc { $PokemonSystem.force_double_wild },
@@ -2484,6 +2527,7 @@ class KurayOptSc_3 < PokemonOption_Scene
     end
     @sprites["title"]=Window_UnformattedTextPokemon.newWithSize(
       _INTL("Graphics settings"),0,0,Graphics.width,64,@viewport)
+    @sprites["title"].setSkin(PokemonOption_Scene.get_kifr_windowskin)
     @sprites["textbox"].text=_INTL("Customize modded features")
 
 
@@ -2498,10 +2542,7 @@ class KurayOptSc_3 < PokemonOption_Scene
   def pbGetOptions(inloadscreen = false)
     options = []
 
-    options << ButtonOption.new(_INTL("### GLOBAL ###"),
-    proc {}
-    )
-
+    options << KIFRSectionHeaderOption.new("GLOBAL")
 
     options << EnumOption.new(_INTL("Big Pokémon Icons"), [_INTL("Off"), _INTL("Limited"), _INTL("All")],
                       proc { $PokemonSystem.kuraybigicons },
@@ -2613,6 +2654,7 @@ class KurayOptSc_6 < PokemonOption_Scene
     end
     @sprites["title"]=Window_UnformattedTextPokemon.newWithSize(
       _INTL("Challenges settings"),0,0,Graphics.width,64,@viewport)
+    @sprites["title"].setSkin(PokemonOption_Scene.get_kifr_windowskin)
     @sprites["textbox"].text=_INTL("Customize modded features")
 
 
@@ -2630,18 +2672,14 @@ class KurayOptSc_6 < PokemonOption_Scene
     if $scene && $scene.is_a?(Scene_Map)
       options.concat(pbGetInGameOptions())
     else
-      options << ButtonOption.new(_INTL("### EMPTY ###"),
-      proc {}
-      )
+      options << KIFRSectionHeaderOption.new("EMPTY")
     end
     return options
   end
 
   def pbGetInGameOptions()
     options = []
-    options << ButtonOption.new(_INTL("### PER-SAVE FILE ###"),
-    proc {}
-    )
+    options << KIFRSectionHeaderOption.new("PER-SAVE FILE")
 
     options << EnumOption.new(_INTL("Metronome Madness"), [_INTL("Off"), _INTL("Normal"), _INTL("Hard")],
                       proc { $PokemonSystem.ch_metronome },
@@ -2698,6 +2736,7 @@ class KurayOptSc_4 < PokemonOption_Scene
     end
     @sprites["title"]=Window_UnformattedTextPokemon.newWithSize(
       _INTL("Others settings"),0,0,Graphics.width,64,@viewport)
+    @sprites["title"].setSkin(PokemonOption_Scene.get_kifr_windowskin)
     @sprites["textbox"].text=_INTL("Customize modded features")
 
 
@@ -2712,9 +2751,7 @@ class KurayOptSc_4 < PokemonOption_Scene
   def pbGetOptions(inloadscreen = false)
     options = []
 
-    options << ButtonOption.new(_INTL("### GLOBAL ###"),
-    proc {}
-    )
+    options << KIFRSectionHeaderOption.new("GLOBAL")
 
     # options << EnumOption.new(_INTL("Global Options"), [_INTL("Off"), _INTL("On")],
     #                   proc { $PokemonSystem.globalvalues },
@@ -2772,9 +2809,7 @@ class KurayOptSc_4 < PokemonOption_Scene
 
   def pbGetInGameOptions()
     options = []
-    options << ButtonOption.new(_INTL("### PER-SAVE FILE ###"),
-    proc {}
-    )
+    options << KIFRSectionHeaderOption.new("PER-SAVE FILE")
 
     options << EnumOption.new(_INTL("Kuray QoL"), [_INTL("Off"), _INTL("On")],
                       proc { $PokemonSystem.kurayqol },
@@ -2794,26 +2829,27 @@ class KurayOptSc_4 < PokemonOption_Scene
                       ["You're playing with Shenanigans! (Easter Eggs)",
                       "You're playing normally! (No Easter Eggs)"]
     )
+    # Streamer's Dream moved to KIFR Settings -> Economy -> Kuray Shop
     # options << EnumOption.new(_INTL("Streamer's Dream"), [_INTL("Off"), _INTL("On"), _INTL("Dream more!")],
-    options << EnumOption.new(_INTL("Streamer's Dream"), [_INTL("Off"), _INTL("On")],
-                      proc { $PokemonSystem.kuraystreamerdream },
-                      proc { |value|
-                        if value == 0
-                          $PokemonSystem.kuraystreamerdream = 0
-                        elsif value == 1
-                          $PokemonSystem.kuraystreamerdream = 1
-                        # elsif value == 2
-                          # $PokemonSystem.kuraystreamerdream = 2
-                          # $game_switches[252]=true
-                          # $game_variables[VAR_PREMIUM_WONDERTRADE_LEFT] = 999999
-                          # $game_variables[VAR_STANDARD_WONDERTRADE_LEFT] = 999999
-                        end
-                        $PokemonSystem.kuraystreamerdream = value
-                      },
-                      ["No Rare Candies/Master Balls/etc free in Kuray Shop",
-                      "Rare Candies/Master Balls and more are free in Kuray Shop",
-                      "Also Unlimited WonderTrades (need 1 badge)"]
-    )
+    # options << EnumOption.new(_INTL("Streamer's Dream"), [_INTL("Off"), _INTL("On")],
+    #                   proc { $PokemonSystem.kuraystreamerdream },
+    #                   proc { |value|
+    #                     if value == 0
+    #                       $PokemonSystem.kuraystreamerdream = 0
+    #                     elsif value == 1
+    #                       $PokemonSystem.kuraystreamerdream = 1
+    #                     # elsif value == 2
+    #                       # $PokemonSystem.kuraystreamerdream = 2
+    #                       # $game_switches[252]=true
+    #                       # $game_variables[VAR_PREMIUM_WONDERTRADE_LEFT] = 999999
+    #                       # $game_variables[VAR_STANDARD_WONDERTRADE_LEFT] = 999999
+    #                     end
+    #                     $PokemonSystem.kuraystreamerdream = value
+    #                   },
+    #                   ["No Rare Candies/Master Balls/etc free in Kuray Shop",
+    #                   "Rare Candies/Master Balls and more are free in Kuray Shop",
+    #                   "Also Unlimited WonderTrades (need 1 badge)"]
+    # )
     #Made by Blue Wuppo
     options << EnumOption.new(_INTL("Overworld Poison"), [_INTL("Off"), _INTL("On"), _INTL("On+Healing")],
                       proc { $PokemonSystem.walkingpoison },
@@ -2851,6 +2887,7 @@ class KurayOptSc_5 < PokemonOption_Scene
     end
     @sprites["title"]=Window_UnformattedTextPokemon.newWithSize(
       _INTL("Self-Battle & Import settings"),0,0,Graphics.width,64,@viewport)
+    @sprites["title"].setSkin(PokemonOption_Scene.get_kifr_windowskin)
     @sprites["textbox"].text=_INTL("Customize modded features")
 
 
@@ -2868,9 +2905,7 @@ class KurayOptSc_5 < PokemonOption_Scene
     if $scene && $scene.is_a?(Scene_Map)
       options.concat(pbGetInGameOptions())
     else
-      options << ButtonOption.new(_INTL("### EMPTY ###"),
-      proc {}
-      )
+      options << KIFRSectionHeaderOption.new("EMPTY")
     end
     return options
   end
@@ -2878,9 +2913,7 @@ class KurayOptSc_5 < PokemonOption_Scene
 
   def pbGetInGameOptions()
     options = []
-    options << ButtonOption.new(_INTL("### PER-SAVE FILE ###"),
-    proc {}
-    )
+    options << KIFRSectionHeaderOption.new("PER-SAVE FILE")
 
     options << EnumOption.new(_INTL("Battle Size"), [_INTL("1"), _INTL("2"), _INTL("3"), _INTL("4"), _INTL("5"), _INTL("6")],
                       proc { $PokemonSystem.sb_battlesize },
